@@ -148,5 +148,5 @@ rfPrediction <- predict(fit, newdata = testSetClean)
 
 ``` {r plots}
 expLayout # this sketch plot shows the experiment's temporal structure.
-fit$coefnames # full list of coefficients included in the random forest model
+fit$coefnames # full list of coefficients included as candidates in the random forest model
 ```
