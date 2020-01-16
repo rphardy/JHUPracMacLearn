@@ -1,0 +1,152 @@
+---
+title: "A Machine Learning Predictor: Human Activity Recognition"
+author: "[Richard Hardy](https://github.com/rphardy)"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+## Summary Report: 
+
+### How the model was built:
+
+Sensor measures were selected from the raw data as potential features, while variables related to the experimental design were removed. Dropped variables were: "X", "user_name", "raw_timestamp_part_1", "raw_timestamp_part_2", "cvtd_timestamp", "new_window", "num_window". 
+
+Variables contaning missing data in the target test set were dropped, based on the pattern of missingess, whereby data was either complete, or completely missing for each sensor measure variable in the test set. 
+
+Then, the variables retained in the test set were retained in the training set, providing a test and training dataset consisting of the direct HAR measurement data only (problem_id was also dropped from the test set).
+
+In the context of this assignment, a high degree of accuracy and training speed were the most important ML model considerations. Therefore, Random Forest was chosen as an initial technique, as it was likely to produce the greatest accuracy, and a parallel processing method was used to improve the training speed:
+
+see [Len Greski's method]("https://github.com/lgreski/datasciencectacontent/blob/master/markdown/pml-randomForestPerformance.md").
+
+This model utilised 5-fold cross-validation and caret defaults, and achieved 99.9% accuracy after cross-validation, hence no further model tuning or selection was required. 
+ 
+### Cross Validation
+
+Caret automates the cross-validation process when fitting a random forest model. 
+
+5-fold cross-validation was specified and gave an accuracy: .993 to .996 across 5 folds.
+
+### Out of sample error:
+
+The model produced a 0.44% out-of-sample error, see the oob error based on the 5-fold cross-validation.
+
+### Prediction model - 20 different test cases: 
+
+20/20 activity types were identified as the correct one of movement class A,B,C,D,E using the 20 cases contained in the test set.
+
+## Method
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+``` {r load_libraries, include=FALSE}
+
+library(caret)
+library(dplyr)
+library(ggplot2)
+library(parallel)
+library(doParallel)
+
+```
+
+### Data Preprocessing
+
+* test set contains 160 variables, including `problem_id`. 100 variables contain entirely missing data. These are removed, leaving complete data for 60 vars. 
+
+* `problem_id` is not present in the training set, and not required for prediction in the testing set, thus it is dropped from test set.
+
+* 52 variables are retained in the training set data, with "classe" added, providing clean homogenous training and testing sets for the ML modelling.
+
+* 3 variables required class to be edited to match in training and test sets.
+
+``` {r data_munging}
+
+trainUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+download.file(trainUrl, destfile = "train.csv")
+download.file(testUrl, destfile = "test.csv")
+
+trainSetRaw <- read.csv("train.csv")
+testSetRaw <- read.csv("test.csv")
+
+projectCitation <- "http://groupware.les.inf.puc-rio.br/har" 
+paperCitation <- "Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; 
+Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. 
+Proceedings of 4th International Conference in Cooperation with SIGCHI 
+(Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013."
+
+## Code to remove the columns with missing values in the test set:
+nmissingTest <- NULL
+        for (i in 1:160) { nmissingTest <- c(nmissingTest, sum(is.na(testSetRaw[,i])))}
+nmissingTest
+
+sum(nmissingTest==0) # 60 vars with complete data. 
+
+testSetClean <- testSetRaw[c(8:11,37:49,60:68,84:86,102,113:124,140,151:160)]
+testSetClean$magnet_dumbbell_z <- as.numeric(testSetClean$magnet_dumbbell_z)
+testSetClean$magnet_forearm_y <- as.numeric(testSetClean$magnet_forearm_y)
+testSetClean$magnet_forearm_z <- as.numeric(testSetClean$magnet_forearm_z)
+ncol(testSetClean) # 53 vars retained   
+
+testSetClean <- testSetClean[1:52] #drop problem_id
+
+
+# name of vars to use in the train set
+trainVarsToKeep <- c(names(testSetClean),"classe") 
+
+trainVarsToKeep %in% names(trainSetRaw) # all accounted for in training set
+
+trainSetClean <- subset(trainSetRaw, select = trainVarsToKeep)
+
+```
+
+### Exploratory Analysis
+
+``` {r experiment_structure}
+
+expLayout <- ggplot(data=trainSetRaw, aes(x=classe, y=cvtd_timestamp, col=user_name))+geom_point(alpha=0.25)
+```
+
+## Building the Model
+
+``` {r ML model}
+
+cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
+registerDoParallel(cluster)
+
+fitControl <- trainControl(method = "cv",
+                           number = 5,
+                           allowParallel = TRUE)
+
+set.seed(13425)
+fit <- train(classe ~ . , method="rf", data=trainSetClean, trControl = fitControl)
+
+stopCluster(cluster)
+registerDoSEQ()
+
+fit
+fit$resample
+confusionMatrix.train(fit)
+
+```
+``` {r model_diagnostics}
+fit$finalModel
+
+```
+
+
+``` {r test_results}
+rfPrediction <- predict(fit, newdata = testSetClean) 
+# Achieves 20/20 on test set - output not displayed, in accordance with honour code
+
+```
+
+## Appendix
+
+``` {r plots}
+expLayout # this sketch plot shows the experiment's temporal structure.
+fit$coefnames # full list of coefficients included in the random forest model
+```
