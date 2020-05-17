@@ -2,4 +2,4 @@
 Project Repo: Johns Hopkins University Data Science Specialisation - Course 8 - Practical Machine Learning
 
 See deliverables:
- - index.Rmd
+ - Machine learning model: index.Rmd
