@@ -3,5 +3,5 @@ Project Repo: Johns Hopkins University Data Science Specialisation - Course 8 - 
 
 Deliverables:
  - R markdown file addressing project brief - Human Activity Recognition data, Activity classification assessed by quiz:
-   Achieved using a Random Forest model: see index.Rmd
+    - Achieved using a Random Forest model: see index.Rmd
  - Quiz performance: 20/20
